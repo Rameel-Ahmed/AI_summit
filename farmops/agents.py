@@ -16,10 +16,10 @@ class Admin:
         bb.say(self.name, f"parsed order via {source}: {facts}")
         rain = facts.get("rain_day") or "Thu"
         days = ALL_DAYS[:ALL_DAYS.index(rain)] if rain in ALL_DAYS else S.DAYS
-        bb.post(self.name, "days", days, f"rain arrives {rain}")
-        bb.post(self.name, "budget_limit", facts.get("budget_limit"))
-        bb.post(self.name, "priorities", facts.get("priorities") or [])
-        bb.post(self.name, "elevator_backed_up", bool(facts.get("elevator_backed_up")))
+        bb.post(self.name, "days", days, f"rain arrives {rain}", authority="USER_ASSERTED")
+        bb.post(self.name, "budget_limit", facts.get("budget_limit"), authority="USER_ASSERTED")
+        bb.post(self.name, "priorities", facts.get("priorities") or [], authority="USER_ASSERTED")
+        bb.post(self.name, "elevator_backed_up", bool(facts.get("elevator_backed_up")), authority="USER_ASSERTED")
         return facts
 
 
@@ -34,8 +34,8 @@ class Diagnostics:
                 bb.alert(f"Unknown fault code {code}: send a human to inspect before running.")
                 continue
             machine = (facts.get("down_machines") or ["Combine 2"])[0]
-            bb.post(self.name, "down_machine", machine, f"{code} = {info['component']}")
-            bb.post(self.name, "repair_hours", info["repair_hours"])
+            bb.post(self.name, "down_machine", machine, f"{code} = {info['component']}", authority="INFERRED")
+            bb.post(self.name, "repair_hours", info["repair_hours"], "p50 estimate", authority="PREDICTED")
             bb.post(self.name, "part_needed", info["part"])
             bb.post(self.name, "skill_needed", "hydraulic" if code.startswith("HYD") else "engine")
             if info["safety"]:
@@ -78,7 +78,7 @@ class Procurement:
         if part:
             offers = [o for o in S.PARTS_SUPPLIERS.get(part, []) if o["in_stock"]]
             best = min(offers, key=lambda o: o["eta_hours"])
-            bb.post(self.name, "part_eta_hours", best["eta_hours"], f"{best['supplier']}, ${best['cost']}")
+            bb.post(self.name, "part_eta_hours", best["eta_hours"], f"{best['supplier']}, ${best['cost']}", authority="VERIFIED")
             bb.post(self.name, "part_cost", best["cost"])
         rental = S.RENTAL_COMBINES[0]
         bb.post(self.name, "rental_option", rental, f"${S.RENTAL_COMBINE_COST_PER_DAY}/day")
@@ -96,11 +96,14 @@ class Logistics:
             elevator = {d: int(v * 0.7) for d, v in elevator.items()}
         bb.post(self.name, "storage_bu_per_day",
                 {d: elevator.get(d, 15000) + S.ON_FARM_DRYER_BU_PER_DAY for d in bb.constraints["days"]},
-                "elevator intake + on-farm dryer")
+                "elevator intake + on-farm dryer", authority="PREDICTED")
 
 
 class Ops:
     name = "Ops"
+
+    def __init__(self, fields=None):
+        self.fields = fields or S.FIELDS
 
     def availability(self, bb):
         """Hours each combine can run each day, given repair timing."""
@@ -109,6 +112,6 @@ class Ops:
         if down:
             ready = max(bb.constraints.get("part_eta_hours", 0),
                         bb.constraints.get("tech_free_hour", 0)) + bb.constraints.get("repair_hours", 0)
-            bb.post(self.name, "back_online_hour", ready, f"{down} ready ~{6 + ready}:00 Mon")
-        bb.post(self.name, "fields", S.FIELDS)
+            bb.post(self.name, "back_online_hour", ready, f"{down} ready ~{6 + ready}:00 Mon", authority="PREDICTED")
+        bb.post(self.name, "fields", self.fields)
         return down, ready

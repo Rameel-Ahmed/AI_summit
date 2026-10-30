@@ -15,20 +15,23 @@ DEFAULT_ORDER = ("Combine 2 is throwing a hydraulic code, rain hits Thursday, "
                  "and the elevator in Lafayette is backed up. Get Creek 200 done first.")
 
 
-def run(order, auto=False):
+def build_blackboard(order, fields=None):
+    """Single-farm pipeline: neural in, then every specialist posts constraints."""
     bb = Blackboard()
-    admin, diag, tech, proc, logi, ops = Admin(), Diagnostics(), Technician(), Procurement(), Logistics(), Ops()
-
-    print(f"\nSUPERVISOR: \"{order}\"\n")
-
-    # Neural in
+    agents = Admin(), Diagnostics(), Technician(), Procurement(), Logistics(), Ops(fields)
+    admin, diag, tech, proc, logi, ops = agents
     facts = admin.handle_order(bb, order)
-    # Each agent posts its constraints to the shared blackboard
     diag.inspect(bb, facts)
     tech.plan_repair(bb)
     proc.source(bb)
     logi.capacity(bb)
     ops.availability(bb)
+    return bb, agents
+
+
+def run(order, auto=False):
+    print(f"\nSUPERVISOR: \"{order}\"\n")
+    bb, (admin, diag, tech, proc, logi, ops) = build_blackboard(order)
 
     print("AGENT LOG")
     for agent, msg in bb.log:

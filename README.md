@@ -36,8 +36,21 @@ fallback runs so the demo works offline.
 - `farmops/blackboard.py` shared state agents post constraints to
 - `farmops/solver.py` CP-SAT model, evaluates options A/B/C
 - `farmops/llm.py` Gemini parse + explain, with offline fallback
-- `farmops/main.py` demo entry point
+- `farmops/main.py` single-farm demo
+- `farmops/coop.py` multi-farm co-op auction with max-consensus
+
+## Authority tags
+Every claim an agent posts carries a tag: OBSERVED, VERIFIED, INFERRED, PREDICTED, USER_ASSERTED or UNKNOWN.
+The solver uses predictions and inferences, but the log shows the supervisor which facts are guesses.
+
+## Multi-farm co-op (`python -m farmops.coop`)
+Farms pool scarce resources (elevator slots, a co-op combine). Each farm runs its own agents and solver
+locally, computes its marginal value for a resource, and broadcasts **only its bid**. Farms agree on the
+winner by max-consensus gossip over a ring network, with no central broker. Fields, yields and machine
+health never leave the farm. A resource nobody gains from stays unassigned. The winning farm's supervisor
+still approves. This is a sequential auction inspired by CBBA, not a full CBBA implementation.
 
 ## Next
-- Multi-farm layer: consensus-based auction (CBBA) for shared elevator slots, rental combines and crews,
-  without farms sharing private data.
+- Weather agent on NWS forecasts (rain as a probabilistic penalty, not a hard deadline)
+- Priority re-weighting from the supervisor ("protect crop over cost") and instant re-solve
+- Data freshness (`valid_until`) checks in the watchdog

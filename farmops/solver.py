@@ -12,7 +12,7 @@ def hours_available(cap, ready_hour, day_idx):
     return max(0, min(cap, cap - max(0, offset)))
 
 
-def solve(bb, name, overtime=False, rent=False):
+def solve(bb, name, overtime=False, rent=False, extra_combine=None, extra_storage_bu=0):
     c = bb.constraints
     days = c["days"]
     fields = c["fields"]
@@ -26,6 +26,10 @@ def solve(bb, name, overtime=False, rent=False):
         r = c["rental_option"]
         combines["Rental"] = r["acres_per_hour"]
         ready["Rental"] = 24 * days.index(r["available_from_day"]) if r["available_from_day"] in days else 999
+
+    if extra_combine:                                   # won from the co-op pool
+        combines[extra_combine["id"]] = extra_combine["rate"]
+        ready[extra_combine["id"]] = 24 * days.index(extra_combine["from_day"]) if extra_combine["from_day"] in days else 999
 
     m = cp_model.CpModel()
     h = {(k, f, d): m.NewIntVar(0, cap, f"h_{k}_{f}_{d}") for k in combines for f in fields for d in days}
@@ -43,7 +47,7 @@ def solve(bb, name, overtime=False, rent=False):
     for d in days:
         bu = sum(S.YIELD_BU_PER_ACRE * combines[k] * h[k, f, d] for k in combines for f in fields)
         m.Add(bu <= c["haul_bu_per_day"])
-        m.Add(bu <= c["storage_bu_per_day"][d])
+        m.Add(bu <= c["storage_bu_per_day"][d] + extra_storage_bu)
 
     ot_hours = []
     if overtime:

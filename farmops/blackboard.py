@@ -10,9 +10,12 @@ class Blackboard:
         self.alerts = []           # watchdog escalations straight to the supervisor
         self.heartbeats = {}       # agent -> last beat time
 
-    def post(self, agent, key, value, note=""):
+    # OBSERVED | VERIFIED | INFERRED | PREDICTED | USER_ASSERTED | UNKNOWN
+    def post(self, agent, key, value, note="", authority="OBSERVED"):
         self.constraints[key] = value
-        self.log.append((agent, f"{key} = {value}" + (f"  ({note})" if note else "")))
+        self.authority = getattr(self, "authority", {})
+        self.authority[key] = authority
+        self.log.append((agent, f"{key} = {value}  [{authority}]" + (f"  ({note})" if note else "")))
         self.beat(agent)
 
     def say(self, agent, msg):
